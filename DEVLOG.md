@@ -1,0 +1,6 @@
+-setup: Docker dektop with 8 cores and about 10.4 GB, minikube v1.37.0, kubernetes v1.34.0, CPU has AVX2 only
+-problems i faced: There was a already a minikube cluster running wchich was occupying the CPU's and memory. Fixed with 'minikube delete' and a fresh start.
+- Image: vllm/vllm-openai-cpu:v0.26.0-x86_64, digest sha256:8ed97d93c37e8025ca91c4bafaebb03529d55bae68dc40af6609fe129b5dad36.
+- Model: Qwen/Qwen3-0.6B (Apache 2.0)
+- First run in plain Docker first start about 6 minutes includeing the download , One request produced 20 token in 1.78s (single call, not a benchmark).
+- Learned: memory sat near the 4 GiB container limit, vLLM saw 8 cores despite --cpus=4, and the NUMA warnings were harmless.
