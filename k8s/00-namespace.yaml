@@ -1,0 +1,4 @@
+apiVersion: v1 # this is the core kubernetes aapi
+kind: Namespace # an isolated area to group our objects
+metadata:
+  name: llm

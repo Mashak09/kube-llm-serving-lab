@@ -1,0 +1,61 @@
+apiVersion: apps/v1                          # API group that defines Deployments
+kind: Deployment                             # keeps N copies of a pod running
+metadata:                                    # descriptive data
+  name: vllm                                 # deployment name
+  namespace: llm                             # our namespace
+spec:                                        # what we want
+  replicas: 1                                # one copy for now (two later)
+  selector:                                  # how the deployment finds its pods
+    matchLabels:
+      app: vllm                              # pods with this label belong to it
+  template:                                  # blueprint for each pod
+    metadata:
+      labels:
+        app: vllm                            # label on every pod (must match selector)
+    spec:
+      automountServiceAccountToken: false    # pod gets no Kubernetes API credentials
+      containers:
+        - name: vllm                         # container name
+          image: vllm/vllm-openai-cpu:v0.26.0-x86_64   # pinned version, no latest
+          args: ["Qwen/Qwen3-0.6B", "--max-model-len", "2048"]   # model, context limit
+          env:
+            - name: VLLM_CPU_KVCACHE_SPACE   # KV cache size setting
+              value: "1"                     # 1 GiB (quoted: env values are text)
+          ports:
+            - containerPort: 8000            # the API listens here
+          resources:
+            requests:
+              cpu: "2"                       # scheduler reserves 2 cores
+              memory: 4Gi                    # scheduler reserves 3 GiB
+            limits:
+              cpu: "4"                       # at most 4 cores of CPU time
+              memory: 6Gi                    # above this the pod is killed (OOM)
+          securityContext:
+            allowPrivilegeEscalation: false  # process cannot gain extra rights
+            capabilities:
+              drop: ["ALL"]                  # remove all extra Linux privileges
+          startupProbe:                      # gives the slow first start time
+            httpGet:
+              path: /health                  # vLLM health URL (assumed)
+              port: 8000                     # same port as the API
+            periodSeconds: 10                # check every 10 seconds
+            failureThreshold: 90             # up to 15 minutes before giving up
+          readinessProbe:                    # decides when traffic may be sent
+            httpGet:
+              path: /health                  # same health URL
+              port: 8000
+            periodSeconds: 10                # check every 10 seconds
+          volumeMounts:
+            - name: model-cache              # the volume defined below
+              mountPath: /root/.cache/huggingface   # same path as in our Docker test
+            - name: dshm                     # shared-memory volume defined below
+              mountPath: /dev/shm            # where programs expect shared memory
+      volumes:
+        - name: model-cache                  # name used by the mount above
+          persistentVolumeClaim:
+            claimName: model-cache           # the claim from Action 10
+        - name: dshm                         # shared memory
+          emptyDir:
+            medium: Memory                   # RAM-backed temporary folder
+            sizeLimit: 1Gi                   # at most 1 GiB
+
